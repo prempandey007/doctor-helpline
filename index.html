@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Doctor Appointment Booking</title>
+  <link rel="stylesheet" href="style.css" />
+  
+</head>
+<body>
+  <!-- <div class="<div style="text-align: right; margin-bottom: 10px;">
+  <button id="toggle-mode" class="btn-toggle">🌓 Toggle Dark Mode</button>
+</div> -->
+
+    <div class="container">
+      <button id="toggle-mode" class="btn-toggle">🌓 Toggle Dark Mode</button>
+      <div class="dark-mode-toggle">
+        
+    </div>
+
+    <h1>Doctor Appointment Booking</h1>
+
+    <div class="form-row">
+      <input type="text" id="user-name" placeholder="Your Name" required />
+      <input type="tel" id="user-phone" placeholder="Phone Number" required />
+      <input type="email" id="user-email" placeholder="Email Address" required />
+    </div>
+
+    <div class="form-row">
+      <label for="doctor-type">Doctor Type:</label>
+      <select id="doctor-type">
+        <option value="General Physician">General Physician</option>
+        <option value="Dentist">Dentist</option>
+        <option value="Cardiologist">Cardiologist</option>
+        <option value="Dermatologist">Dermatologist</option>
+        <option value="Pediatrician">Pediatrician</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <label for="appointment-date">Select Date:</label>
+      <input type="date" id="appointment-date" />
+    </div>
+
+    <div class="slots" id="slots-container"></div>
+
+    <div class="form-row" style="display: none;" id="confirm-row">
+      <button id="confirm-btn" class="btn-confirm">✅ Confirm Booking</button>
+    </div>
+
+    <div class="summary" id="summary"></div>
+
+    <div class="admin-controls">
+      <button onclick="clearAllAppointments()">🧹 Clear All Appointments</button>
+    </div>
+
+    <div class="all-bookings" id="all-bookings"></div>
+  </div>
+
+  <script>
+    const startHour = 10; // 10 AM
+    const endHour = 21; // 9 PM
+    const slotDuration = 45;
+
+    const doctorSelect = document.getElementById('doctor-type');
+    const dateInput = document.getElementById('appointment-date');
+    const slotsContainer = document.getElementById('slots-container');
+    const summary = document.getElementById('summary');
+    const allBookingsDiv = document.getElementById('all-bookings');
+
+    const confirmRow = document.getElementById('confirm-row');
+    const confirmBtn = document.getElementById('confirm-btn');
+
+    let appointments = JSON.parse(localStorage.getItem("appointments")) || [];
+    let selectedSlot = null;
+
+    dateInput.valueAsDate = new Date();
+
+    function saveAppointments() {
+      localStorage.setItem("appointments", JSON.stringify(appointments));
+    }
+
+    function isSlotBooked(doctor, date, time) {
+      return appointments.some(app => app.doctor === doctor && app.date === date && app.time === time);
+    }
+
+    function generateTimeSlots() {
+      const slots = [];
+      const date = new Date();
+      date.setHours(startHour, 0, 0, 0);
+
+      while (date.getHours() < endHour) {
+        const start = new Date(date);
+        date.setMinutes(date.getMinutes() + slotDuration);
+        const end = new Date(date);
+        slots.push({
+          start: start.toTimeString().slice(0, 5),
+          end: end.toTimeString().slice(0, 5)
+        });
+      }
+
+      return slots;
+    }
+
+    function renderSlots() {
+      slotsContainer.innerHTML = '';
+      selectedSlot = null;
+      confirmRow.style.display = "none";
+
+      const selectedDate = dateInput.value;
+      const doctorType = doctorSelect.value;
+      const slots = generateTimeSlots();
+
+      slots.forEach((slot) => {
+        const slotTime = `${slot.start} - ${slot.end}`;
+        const isDisabled = isSlotBooked(doctorType, selectedDate, slotTime);
+
+        const btn = document.createElement('button');
+        btn.innerText = slotTime;
+        btn.disabled = isDisabled;
+
+        btn.onclick = () => {
+          selectedSlot = {
+            time: slotTime,
+            date: selectedDate,
+            doctor: doctorType
+          };
+          highlightSlotButton(btn);
+          confirmRow.style.display = "block";
+        };
+
+        slotsContainer.appendChild(btn);
+      });
+    }
+
+    function highlightSlotButton(selectedBtn) {
+      const buttons = document.querySelectorAll('#slots-container button');
+      buttons.forEach(btn => btn.style.backgroundColor = "#3498db");
+      selectedBtn.style.backgroundColor = "#2ecc71";
+    }
+
+    confirmBtn.onclick = () => {
+      if (!selectedSlot) return;
+
+      const name = document.getElementById("user-name").value.trim();
+      const phone = document.getElementById("user-phone").value.trim();
+      const email = document.getElementById("user-email").value.trim();
+
+      if (!name || !phone || !email) {
+        alert("❗ Please fill out all user details.");
+        return;
+      }
+
+      confirmBtn.classList.add("loading");
+
+      setTimeout(() => {
+        const newAppointment = {
+          name, phone, email,
+          doctor: selectedSlot.doctor,
+          date: selectedSlot.date,
+          time: selectedSlot.time
+        };
+
+        appointments.push(newAppointment);
+        saveAppointments();
+
+        summary.innerText = `✅ Appointment Confirmed:\nDoctor: ${selectedSlot.doctor}\nName: ${name}\nDate: ${selectedSlot.date}\nTime: ${selectedSlot.time}`;
+        summary.classList.add("success-animate");
+
+        renderSlots();
+        renderAllBookings();
+
+        confirmBtn.classList.remove("loading");
+        confirmRow.style.display = "none";
+
+        setTimeout(() => {
+          summary.classList.remove("success-animate");
+        }, 1000);
+      }, 1000); // Fake delay for fun effect
+    };
+
+    function renderAllBookings() {
+      if (appointments.length === 0) {
+        allBookingsDiv.innerText = "📭 No appointments booked yet.";
+        return;
+      }
+
+      allBookingsDiv.innerText = "📋 All Bookings:\n\n" + appointments.map(app => {
+        return `👤 ${app.name}\n📞 ${app.phone}\n📧 ${app.email}\n🩺 ${app.doctor}\n📅 ${app.date} 🕒 ${app.time}\n---`;
+      }).join('\n');
+    }
+
+    function clearAllAppointments() {
+      if (confirm("Are you sure you want to delete all appointments?")) {
+        appointments = [];
+        localStorage.removeItem("appointments");
+        renderSlots();
+        renderAllBookings();
+        summary.innerText = "";
+        alert("🧹 All bookings cleared!");
+      }
+    }
+
+    doctorSelect.addEventListener('change', renderSlots);
+    dateInput.addEventListener('change', renderSlots);
+
+    renderSlots();
+    renderAllBookings();
+    const toggleBtn = document.getElementById('toggle-mode');
+
+// Load saved theme from localStorage
+if (localStorage.getItem('darkMode') === 'true') {
+  document.body.classList.add('dark');
+}
+
+toggleBtn.onclick = () => {
+  document.body.classList.toggle('dark');
+  const isDark = document.body.classList.contains('dark');
+  localStorage.setItem('darkMode', isDark);
+};
+
+  </script>
+</body>
+</html>
